@@ -1,0 +1,43 @@
+.errorStyle {
+    color: @errorText;
+    fill: @errorText; 
+}
+
+.warningStyle() {
+    color: @warningText;
+    fill: @warningText;
+    .errorStyle;
+}
+
+.successStyle(@t) {
+    color: @t;
+    fill: @successText;
+    .inner {
+        // color: @successColor;
+        .warningStyle;
+      }
+}
+
+.success {
+    .main {
+        .successStyle(@errorText);
+    }
+    &--main {
+        .errorStyle();
+        .main;
+        span {
+            .main;
+        }
+    }
+    .successStyle();
+}
+
+.error {
+    .main {
+        .successStyle(@errorText);
+    }
+    &--main {
+        .errorStyle()
+    }
+    // .successStyle();
+}
