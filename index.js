@@ -120,14 +120,14 @@ function walkDecls(root) {
     }
   });
 
-  const map = vars.reduce((prev, currValue) => {
-    prev[currValue.name] = {
-      selectors: output[currValue.name] || {},
-      value: currValue.value,
-    };
-    return prev;
-  }, output);
-  return map;
+  // const map = vars.reduce((prev, currValue) => {
+  //   prev[currValue.name] = {
+  //     selectors: output[currValue.name] || {},
+  //     value: currValue.value,
+  //   };
+  //   return prev;
+  // }, output);
+  return output;
 }
 
 /**
@@ -171,12 +171,15 @@ function checkRule(rule) {
 function getAllMixins(root) {
   const mapMixins = {};
   function parseRule(node) {
+    // console.log(node.clone());
     if (!node.nodes || node.nodes.length) {
       if (node.type === "decl") {
         return node;
       }
       if (node.mixin) {
         const mixinName = `${node.raws.identifier}${node.name}`;
+        if (!mapMixins[mixinName]) writeToFile(Object.keys(mapMixins));
+        // console.log(mixinName);
         mapMixins[mixinName].nodes.forEach((child) => {
           node.before(child.clone());
         });
@@ -186,11 +189,15 @@ function getAllMixins(root) {
     }
     node.each((child) => {
       if (child.type === "rule" && !mapMixins[child.selector.split("(")[0]]) {
-        const name =
+        const names =
           child.selector[0] === "&"
             ? parseSelector(child.selector.split("(")[0], child)
-            : child.selector.split("(")[0];
-        mapMixins[name] = parseRule(child);
+            : [child.selector.split("(")[0].trim()];
+        const rule = parseRule(child);
+
+        names.forEach((name) => {
+          mapMixins[name] = rule;
+        });
       } else {
         const newChild = parseRule(child);
         if (!newChild.mixin) {
@@ -201,6 +208,14 @@ function getAllMixins(root) {
     return node;
   }
 
+  // function findSelector(nameSeelctor, root) {
+  //   root.each(node => {
+  //     if (node.type === "rule" && node.selector === nameSeelctor) {
+
+  //     }
+  //   });
+  // }
+
   root.walkRules((node) => {
     if (node.type === "rule") {
       let newRule = node;
@@ -210,8 +225,11 @@ function getAllMixins(root) {
       const mixinName =
         newRule.selector[0] === "&"
           ? parseSelector(newRule.selector.split("(")[0], node)
-          : newRule.selector.split("(")[0];
-      mapMixins[mixinName] = newRule;
+          : [newRule.selector.split("(")[0].trim()];
+      mixinName.forEach((name) => {
+        mapMixins[name] = newRule;
+      });
+      // mapMixins[mixinName] = newRule;
     }
   });
   return mapMixins;
@@ -227,12 +245,12 @@ function getCleanTree(ast) {
 
 function getAllFilesName(root, mainPath) {
   const pathFiles = [];
-  const mainDir = path.dirname(mainPath);
-  root.walkAtRules((rule) => {
-    if (rule.name === "import") {
-      pathFiles.push(path.join(mainDir, rule.params.split('"')[1]));
-    }
-  });
+  // const mainDir = path.dirname(mainPath);
+  // root.walkAtRules((rule) => {
+  //   if (rule.name === "import") {
+  //     pathFiles.push(path.join(mainDir, rule.params.split('"')[1]));
+  //   }
+  // });
   return pathFiles;
 }
 
@@ -302,10 +320,15 @@ async function start(varPath, mainPath) {
 
     const ast = getCleanTree(newRoot);
     const mapMixins = getAllMixins(ast.root);
-    const allDecl = walkDecls(newRoot.root);
-    parseVariables(allDecl);
-    const filteredVars = filterVariables(allDecl, vars);
-    writeToFile(filteredVars);
+    const allDecl = walkDecls(ast.root);
+    // parseVariables(allDecl);
+    // const filteredVars = filterVariables(allDecl, vars);
+    // writeToFile(ast.root.toJSON());
+    // const res = {};
+    // Object.keys(mapMixins).forEach((key) => {
+    //   res[key] = mapMixins[key].clone().toJSON();
+    // });
+    writeToFile(allDecl);
   } catch (error) {
     console.log(error);
     throw error;
@@ -314,5 +337,5 @@ async function start(varPath, mainPath) {
 
 start(
   path.join(__dirname, "variables.json"),
-  path.join(__dirname, "example/example.less")
+  path.join(__dirname, "example/main.less")
 );
