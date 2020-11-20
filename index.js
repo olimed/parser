@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const postcss = require("postcss");
 const syntax = require("postcss-less");
-const autoprefixer = require("autoprefixer");
+const readline = require("readline");
 
 /**
  * Function devides str into an ordered list of substrings
@@ -254,6 +254,30 @@ function getAllFilesName(root, mainPath) {
   return pathFiles;
 }
 
+async function getFileImports(
+  mainPath = path.join(__dirname, "example/main.less")
+) {
+  try {
+    const allPathes = [];
+    const data = await fs.promises.readFile(mainPath);
+    console.log(data.toString().split("\n"));
+    // const rl = readline.createInterface({
+    //   input: fs.createReadStream(mainPath),
+    //   output: process.stdout,
+    //   terminal: false,
+    // });
+
+    // rl.on("line", function (line) {
+    //   if (line.includes("@import ")) {
+    //     console.log(line);
+    //   }
+    // });
+  } catch (error) {
+    console.log(error);
+    throw error;
+  }
+}
+
 async function importAllFiles(pathes) {
   try {
     const mainPath = path.join(__dirname, "./dist/main.less");
@@ -310,7 +334,7 @@ async function start(varPath, mainPath) {
     let vars = fs.readFileSync(varPath, "utf8");
     vars = JSON.parse(vars);
     const mainLess = fs.readFileSync(mainPath, "utf8");
-    const mainRoot = await postcss(autoprefixer()).process(mainLess, {
+    const mainRoot = await postcss().process(mainLess, {
       syntax,
       from: mainPath,
     });
@@ -335,7 +359,9 @@ async function start(varPath, mainPath) {
   }
 }
 
-start(
-  path.join(__dirname, "variables.json"),
-  path.join(__dirname, "example/main.less")
-);
+// start(
+//   path.join(__dirname, "variables.json"),
+//   path.join(__dirname, "example/main.less")
+// );
+
+getFileImports();
