@@ -1,0 +1,7 @@
+@errorText:               #ca0b0b;
+
+.horizontal(@startColor: #555, @endColor: #333){
+    background-color: @endColor;
+    background-image: linear-gradient(to right, @startColor, @endColor); // Standard, IE10
+    background-repeat: repeat-x;
+}

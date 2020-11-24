@@ -1,8 +1,9 @@
 const fs = require("fs");
 const path = require("path");
+const { root } = require("postcss");
 const postcss = require("postcss");
 const syntax = require("postcss-less");
-const readline = require("readline");
+const async = require("async");
 
 /**
  * Function devides str into an ordered list of substrings
@@ -17,13 +18,22 @@ function parseParams(str) {
       allArgs = [
         ...allArgs,
         ...args.split(",").filter((val) => !val.trim().indexOf("@")),
+        // .map((val) => val.split(":")[0]),
       ];
       return allArgs;
     }, []);
-    return allParams;
+    return allParams.map((p) => p.trim().split(")")[0]);
   }
   const params = str.split(",").map((p) => p.trim());
   return params.filter((p) => !p.toString().trim().indexOf("@"));
+}
+
+function getNameSelector(str) {
+  const name = str.replace(/(\r\n|\n|\r)/gm, "");
+  if (name.includes("(")) {
+    return [name.split("(")[0]];
+  }
+  return name.split(",");
 }
 
 /**
@@ -38,7 +48,7 @@ function parseSelector(selector, decl) {
   if (decl.type == "root") return selector;
   const selectors = Array.isArray(selector)
     ? [...selector]
-    : selector.replace(/(\r\n|\n|\r)/gm, "").split(",");
+    : getNameSelector(selector);
   const parentSelectors = decl.parent.selector
     ? decl.parent.selector.replace(/(\r\n|\n|\r)/gm, "").split(",")
     : [""];
@@ -107,6 +117,8 @@ function walkDecls(root) {
           : decl.parent.selector.split('"')[1],
         decl.parent
       );
+      console.log("5555555555555");
+      console.log(selectors);
       const varName = ind == 0 ? [decl.value] : parseParams(decl.value);
       varName.forEach((v) => {
         selectors.forEach((selector) => {
@@ -243,35 +255,57 @@ function getCleanTree(ast) {
   return newAst;
 }
 
-function getAllFilesName(root, mainPath) {
+async function getAllFilesName(root, mainPath) {
   const pathFiles = [];
-  // const mainDir = path.dirname(mainPath);
-  // root.walkAtRules((rule) => {
-  //   if (rule.name === "import") {
-  //     pathFiles.push(path.join(mainDir, rule.params.split('"')[1]));
-  //   }
-  // });
-  return pathFiles;
+  const mainDir = path.dirname(mainPath);
+  root.walkAtRules((rule) => {
+    if (rule.name === "import") {
+      pathFiles.push(path.join(mainDir, rule.params.split('"')[1]));
+    }
+  });
+  let allPathes = [...pathFiles];
+  await Promise.all(
+    pathFiles.map(async (p) => {
+      const ps = await getInnerImports(p, root, allPathes);
+      allPathes = [...allPathes, ...ps];
+    })
+  );
+  allPathes = [...allPathes.reverse(), mainPath];
+  return allPathes;
 }
 
-async function getFileImports(
-  mainPath = path.join(__dirname, "example/main.less")
-) {
+async function getInnerImports(mainPath, mainRoot, pathes = []) {
   try {
-    const allPathes = [];
+    let pathFiles = [];
+    const mainDir = path.dirname(mainPath);
     const data = await fs.promises.readFile(mainPath);
-    console.log(data.toString().split("\n"));
-    // const rl = readline.createInterface({
-    //   input: fs.createReadStream(mainPath),
-    //   output: process.stdout,
-    //   terminal: false,
-    // });
-
-    // rl.on("line", function (line) {
-    //   if (line.includes("@import ")) {
-    //     console.log(line);
-    //   }
-    // });
+    const res = await postcss().process(data, {
+      syntax,
+      from: mainPath,
+    });
+    if (!res) {
+      console.log(`Something went wrong while building AST from ${mainPath}`);
+      throw error;
+    }
+    const root = res.root;
+    root.walkAtRules((rule) => {
+      if (rule.name === "import") {
+        const newPath = path.join(mainDir, rule.params.split('"')[1]);
+        if (!pathes.includes(newPath)) pathFiles.push(newPath);
+      }
+    });
+    if (!pathFiles.length) return pathFiles;
+    let allPathes = [...pathFiles];
+    await Promise.all(
+      pathFiles.map(async (p) => {
+        const ps = await getInnerImports(p, mainRoot, [
+          ...pathes,
+          ...pathFiles,
+        ]);
+        allPathes = [...allPathes, ...ps];
+      })
+    );
+    return allPathes;
   } catch (error) {
     console.log(error);
     throw error;
@@ -288,7 +322,7 @@ async function importAllFiles(pathes) {
     pathes.forEach((p) => {
       const newLess = fs.readFileSync(p, "utf8");
       if (newLess) {
-        fs.appendFileSync(mainPath, Buffer.from(newLess));
+        fs.appendFileSync(mainPath, Buffer.from(`${newLess}\n`));
       }
     });
     fs.closeSync(fd);
@@ -296,7 +330,7 @@ async function importAllFiles(pathes) {
       path.join(__dirname, "dist/main.less"),
       "utf8"
     );
-    const res = await postcss(autoprefixer()).process(less, {
+    const res = await postcss().process(less, {
       syntax,
       from: mainPath,
     });
@@ -329,8 +363,9 @@ function filterVariables(allVars, vars) {
   }, {});
 }
 
-async function start(varPath, mainPath) {
+async function start() {
   try {
+    const [varPath, mainPath] = await getCorrectParams();
     let vars = fs.readFileSync(varPath, "utf8");
     vars = JSON.parse(vars);
     const mainLess = fs.readFileSync(mainPath, "utf8");
@@ -338,15 +373,14 @@ async function start(varPath, mainPath) {
       syntax,
       from: mainPath,
     });
-    const allImports = getAllFilesName(mainRoot.root, mainPath);
-    allImports.push(mainPath);
+    const allImports = await getAllFilesName(mainRoot.root, mainPath);
     const newRoot = await importAllFiles(allImports);
 
     const ast = getCleanTree(newRoot);
     const mapMixins = getAllMixins(ast.root);
     const allDecl = walkDecls(ast.root);
-    // parseVariables(allDecl);
-    // const filteredVars = filterVariables(allDecl, vars);
+    parseVariables(allDecl);
+    const filteredVars = filterVariables(allDecl, vars);
     // writeToFile(ast.root.toJSON());
     // const res = {};
     // Object.keys(mapMixins).forEach((key) => {
@@ -359,9 +393,29 @@ async function start(varPath, mainPath) {
   }
 }
 
+async function getCorrectParams() {
+  try {
+    const dir = path.dirname(process.argv[1]);
+    let varPath = process.argv[2];
+    let lessPath = process.argv[3];
+    let isExist = await fs.promises.stat(varPath);
+    if (!isExist) {
+      varPath = path.join(dir, varPath);
+    }
+    isExist = await fs.promises.stat(lessPath);
+    if (!isExist) {
+      lessPath = path.join(dir, lessPath);
+    }
+    return [varPath, lessPath];
+  } catch (error) {
+    console.log(`No such file or directory ${error.path}`);
+    throw error;
+  }
+}
+
+start();
+
 // start(
 //   path.join(__dirname, "variables.json"),
 //   path.join(__dirname, "example/main.less")
 // );
-
-getFileImports();
