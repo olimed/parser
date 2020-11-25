@@ -318,8 +318,7 @@
 @file-error-bg:                 #FDE5E5;
 
 // Fields
-@field-error:                   #DE3030;
-@import "customizableConstants.less";
+@field-error:                   #DE3030;@import "customizableConstants.less";
 
 @text-reverse-secondary:        @background-content;
 @text-secondary-alternative:    #66788C;
@@ -473,9 +472,7 @@
 @navigation-padding:            8px;
 @navigation-padding-second-lvl: 16px;
 @navigation-content-height:     32px;
-@navigation-font-size:          14px;
-
-@font-face {
+@navigation-font-size:          14px;@font-face {
     font-family: "Roboto";
     font-style: normal;
     font-weight: 300;
@@ -1604,12 +1601,9 @@
   .wide;
   .tall;
 }
-  
-.ellipsis{
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  word-wrap: normal;
+
+.ellipsis() {
+  .text-overflow();
 }
 
 .geo-labs-enabled .geo-navigator-list {
@@ -1904,6 +1898,8 @@
     background-color: @background-main;
     color: @background-field-disabled;
 }
+
+
 
 .geo-labs-enabled .geo-list {
     display: flex;
@@ -3192,7 +3188,6 @@
   }
 }
 
-
 .geo-button-colors {
   color: @secondary-button__text;
   fill: @secondary-button__fill;
@@ -3250,6 +3245,28 @@
   .geo-button-colors--disabled();
 }
 
+
+
+.geo-pressed-colors {
+  color: @pressed-button__text;
+  fill: @pressed-button__fill;
+  border-color: @pressed-button__border;
+  background-color: @pressed-button__background;
+}
+
+.geo-pressed-colors--hover {
+  color: @pressed-button__text--hover;
+  fill: @pressed-button__fill--hover;
+  border-color: @pressed-button__border--hover;
+  background-color: @pressed-button__background--hover;
+}
+
+.geo-pressed-colors--active {
+  color: @pressed-button__text--active;
+  fill: @pressed-button__fill--active;
+  border-color: @pressed-button__border--active;
+  background-color: @pressed-button__background--active;
+}
 
 .geo-action-colors {
   color: @action-button__text;
@@ -4260,7 +4277,6 @@
     }
 }
 
-
 .geo-labs-enabled .geo-selection-textarea {
   .geo-text-field-mixin();
   resize: none;
@@ -4468,7 +4484,6 @@
     letter-spacing: 0.32px;
 }
 
-
 .helper-text-01 {
     font-family: @main-font;
     font-size: 12px;
@@ -4478,27 +4493,6 @@
     letter-spacing: 0.32px;
 }
 
-
-.geo-pressed-colors {
-    color: @pressed-button__text;
-    fill: @pressed-button__fill;
-    border-color: @pressed-button__border;
-    background-color: @pressed-button__background;
-}
-
-.geo-pressed-colors--hover {
-    color: @pressed-button__text--hover;
-    fill: @pressed-button__fill--hover;
-    border-color: @pressed-button__border--hover;
-    background-color: @pressed-button__background--hover;
-}
-
-.geo-pressed-colors--active {
-    color: @pressed-button__text--active;
-    fill: @pressed-button__fill--active;
-    border-color: @pressed-button__border--active;
-    background-color: @pressed-button__background--active;
-}
 
 .geo-pressed-colors--disabled {
     .geo-pressed-colors();
@@ -12414,6 +12408,12 @@ input[type="range"].vanillaSlider:focus {
     user-select: none;
   }
   
+  .ellipsis{
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-wrap: normal;
+  }
 
   .border(@size:1px, @color: black, @type: solid){
     border-width: @size;
@@ -13805,8 +13805,7 @@ input[type="range"].vanillaSlider:focus {
         float: none;
         width: 100%;
     }
-}
-@media (max-width: @screen-xs) {
+}@media (max-width: @screen-xs) {
     .report-autocomplete {
         width: 100% !important;
     }
@@ -14348,7 +14347,6 @@ input[type="range"].vanillaSlider:focus {
 @media (max-width: 545px) {
   #topBar .orgFilterSelection {
     display: none;
-    color: @mainColor
   }
 
   #topBar .orgFilterSelectionAmount {
@@ -28191,9 +28189,6 @@ a img {
 }
 
 
-.ellipsis {
-    .text-overflow();
-}
 
 .capitalize {
     text-transform: capitalize;

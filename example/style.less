@@ -5,3 +5,14 @@
     background-image: linear-gradient(to right, @startColor, @endColor); // Standard, IE10
     background-repeat: repeat-x;
 }
+
+@media (max-width: 545px) {
+    #topBar .orgFilterSelection {
+      display: none;
+      color: @mainColor
+    }
+  
+    #topBar .orgFilterSelectionAmount {
+      display: inline;
+    }
+  }
