@@ -1,4 +1,9 @@
 # parser
 
-1) npm install
-2) node index.js
+
+## Usage
+
+ ```bash
+npm install
+node index.js 'full path or relative path to JSON file with variables' 'full path or relative path to less file'
+```

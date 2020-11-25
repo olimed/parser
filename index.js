@@ -1,9 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { root } = require("postcss");
 const postcss = require("postcss");
 const syntax = require("postcss-less");
-const async = require("async");
 
 /**
  * Function devides str into an ordered list of substrings
