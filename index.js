@@ -377,9 +377,8 @@ async function start() {
       syntax,
       from: mainPath,
     });
-    // const allImports = await getAllFilesName(mainRoot.root, mainPath);
-    // const newRoot = await importAllFiles(allImports);
-    const newRoot = await importAllFiles([mainPath]);
+    const allImports = await getAllFilesName(mainRoot.root, mainPath);
+    const newRoot = await importAllFiles(allImports);
 
     const ast = getCleanTree(newRoot);
     const mapMixins = getAllMixins(ast.root);
