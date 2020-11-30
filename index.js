@@ -32,6 +32,9 @@ function parseParams(str) {
 
 function getNameSelector(str) {
   const name = str.replace(/(\r\n|\n|\r)/gm, "");
+  if (name.indexOf(')') < name.indexOf(',')) {
+    return name.split(",");
+  }
   if (name.includes("(")) {
     return [name.split("(")[0]];
   }
@@ -115,9 +118,8 @@ function parseVariables(allVars) {
  *
  * @return {{selectors: Object<String, Array<String>, value: String}}
  */
-function walkDecls(root) {
+function walkDecls(root, vars) {
   const output = {};
-  const { vars } = getVarsAndMixins(root);
   root.walkDecls((decl) => {
     const ind = decl.value.toString().indexOf("@");
     if (ind != -1) {
@@ -141,6 +143,7 @@ function walkDecls(root) {
   });
   const variables = vars.reduce((prev, v) => {
     prev[v.name] = {
+      selectors: {},
       value: v.value
     }
     return prev;
@@ -151,7 +154,7 @@ function walkDecls(root) {
       value: variables[key] ? variables[key].value : "",
     };
     return prev;
-  }, {});
+  }, variables);
   return map;
 }
 
@@ -277,9 +280,8 @@ async function getAllFilesName(root, mainPath) {
       allPathes.splice(ind, 0, ...ps);
     })
   );
-  // allPathes = [...allPathes.reverse(), mainPath];
   allPathes = [...allPathes, mainPath];
-  return [...new Set(allPathes)]; //allPathes.uni;
+  return [...new Set(allPathes)];
 }
 
 async function getInnerImports(mainPath, mainRoot, ind, pathes = []) {
@@ -357,7 +359,7 @@ function writeToFile(text) {
       fs.mkdirSync("./dist");
     }
     const fd = fs.openSync(mainPath, "w+");
-    fs.writeFileSync(mainPath, Buffer.from(JSON.stringify(text)));
+    fs.writeFileSync(mainPath, JSON.stringify(text)); //Buffer.from(JSON.stringify(text))
     fs.closeSync(fd);
   } catch (error) {
     console.log(error);
@@ -382,25 +384,17 @@ async function start() {
       syntax,
       from: mainPath,
     });
-    // const allImports = await getAllFilesName(mainRoot.root, mainPath);
-    // writeToFile(allImports);
-    // const newRoot = await importAllFiles(allImports);
-
-
-    const newRoot = await importAllFiles([mainPath]);
-
+    const allImports = await getAllFilesName(mainRoot.root, mainPath);
+    const newRoot = await importAllFiles(allImports);
     const ast = getCleanTree(newRoot);
     
-    const mapMixins = getAllMixins(ast.root);
-    const allDecl = walkDecls(ast.root);
+    const mapMixins = getAllMixins(ast.root);    
+    const varsLess= getVarsAndMixins(ast.root).vars;
+    const allDecl = walkDecls(ast.root, varsLess);
     parseVariables(allDecl);
-    writeToFile(allDecl);
-
-
-
-    // const filteredVars = filterVariables(allDecl, vars);
-    // // console.log(allDecl);
-    // writeToFile(filteredVars);
+    
+    const filteredVars = filterVariables(allDecl, vars);
+    writeToFile(filteredVars);
   } catch (error) {
     console.log(error);
     throw error;
@@ -430,4 +424,4 @@ async function getCorrectParams() {
 start();
 
 
-// console.log(process.env.NODE_ENV = 'production')
+// console.log(process.env.NODE_ENV = 'production');
