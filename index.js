@@ -22,8 +22,12 @@ function parseParams(str) {
     }, []);
     return allParams.map((p) => p.trim().split(")")[0]);
   }
-  const params = str.split(",").map((p) => p.trim());
-  return params.filter((p) => !p.toString().trim().indexOf("@"));
+  let params = str.split(' ');
+  if (str.includes(',')) {
+    params = str.split(",");
+  } 
+  params = params.map((p) => p.trim());
+  return params.filter((p) => p.includes("@"));
 }
 
 function getNameSelector(str) {
@@ -123,7 +127,7 @@ function walkDecls(root) {
           : decl.parent.selector.split('"')[1],
         decl.parent
       );
-      const varName = ind == 0 ? [decl.value] : parseParams(decl.value);
+      const varName = parseParams(decl.value); // ind == 0 ? [decl.value] : 
       varName.forEach((v) => {
         selectors.forEach((selector) => {
           output[v] = {
@@ -386,16 +390,17 @@ async function start() {
     const newRoot = await importAllFiles([mainPath]);
 
     const ast = getCleanTree(newRoot);
+    
     const mapMixins = getAllMixins(ast.root);
     const allDecl = walkDecls(ast.root);
     parseVariables(allDecl);
-    // writeToFile(allDecl);
+    writeToFile(allDecl);
 
 
 
-    const filteredVars = filterVariables(allDecl, vars);
-    // console.log(allDecl);
-    writeToFile(filteredVars);
+    // const filteredVars = filterVariables(allDecl, vars);
+    // // console.log(allDecl);
+    // writeToFile(filteredVars);
   } catch (error) {
     console.log(error);
     throw error;
