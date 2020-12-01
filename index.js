@@ -21,12 +21,19 @@ function parseParams(str) {
     }, []);
     return allParams.map((p) => p.trim().split(")")[0]);
   }
-  const params = str.split(",").map((p) => p.trim());
-  return params.filter((p) => !p.toString().trim().indexOf("@"));
+  let params = str.split(' ');
+  if (str.includes(',')) {
+    params = str.split(",");
+  } 
+  params = params.map((p) => p.trim());
+  return params.filter((p) => p.includes("@"));
 }
 
 function getNameSelector(str) {
   const name = str.replace(/(\r\n|\n|\r)/gm, "");
+  if (name.indexOf(')') < name.indexOf(',')) {
+    return name.split(",");
+  }
   if (name.includes("(")) {
     return [name.split("(")[0]];
   }
@@ -110,9 +117,8 @@ function parseVariables(allVars) {
  *
  * @return {{selectors: Object<String, Array<String>, value: String}}
  */
-function walkDecls(root) {
+function walkDecls(root, vars) {
   const output = {};
-  const { vars } = getVarsAndMixins(root);
   root.walkDecls((decl) => {
     const ind = decl.value.toString().indexOf("@");
     if (ind != -1) {
@@ -122,7 +128,7 @@ function walkDecls(root) {
           : decl.parent.selector.split('"')[1],
         decl.parent
       );
-      const varName = ind == 0 ? [decl.value] : parseParams(decl.value);
+      const varName = parseParams(decl.value); // ind == 0 ? [decl.value] : 
       varName.forEach((v) => {
         selectors.forEach((selector) => {
           output[v] = {
@@ -136,6 +142,7 @@ function walkDecls(root) {
   });
   const variables = vars.reduce((prev, v) => {
     prev[v.name] = {
+      selectors: {},
       value: v.value
     }
     return prev;
@@ -146,7 +153,7 @@ function walkDecls(root) {
       value: variables[key] ? variables[key].value : "",
     };
     return prev;
-  }, {});
+  }, variables);
   return map;
 }
 
@@ -189,7 +196,7 @@ function checkRule(rule) {
 function getAllMixins(root) {
   try {
     const mapMixins = {};
-    function parseRule(node) {
+    function parseRule(node, parentSelector) {
       if (!node.nodes || node.nodes.length) {
         if (node.type === "decl") {
           return node;
@@ -197,8 +204,8 @@ function getAllMixins(root) {
         if (node.mixin) {
           const mixinName = `${node.raws.identifier}${node.name}`;
           if (!mapMixins[mixinName]) {
-            console.log(`Please define mixin ${mixinName} before`)
-            throw `Please define mixin ${mixinName} before class`
+            console.log(`Please define class/mixin ${mixinName} before ${parentSelector || ""}`)
+            throw `Please define mixin ${mixinName} before ${parentSelector || ""}`
           }
           mapMixins[mixinName].nodes.forEach((child) => {
             node.before(child.clone());
@@ -213,13 +220,13 @@ function getAllMixins(root) {
             child.selector[0] === "&"
               ? parseSelector(child.selector.split("(")[0], child)
               : [child.selector.split("(")[0].trim()];
-          const rule = parseRule(child);
+          const rule = parseRule(child, node.selector);
 
           names.forEach((name) => {
             mapMixins[name] = rule;
           });
         } else {
-          const newChild = parseRule(child);
+          const newChild = parseRule(child, node.selector);
           if (!newChild.mixin) {
             child.replaceWith(newChild);
           }
@@ -245,7 +252,6 @@ function getAllMixins(root) {
     });
     return mapMixins;
   } catch (error) {
-    console.log(error);
     throw error;
   }
 }
@@ -268,16 +274,16 @@ async function getAllFilesName(root, mainPath) {
   });
   let allPathes = [...pathFiles];
   await Promise.all(
-    pathFiles.map(async (p) => {
-      const ps = await getInnerImports(p, root, allPathes);
-      allPathes = [...allPathes, ...ps];
+    pathFiles.map(async (p, ind) => {
+      const ps = await getInnerImports(p, root, ind, allPathes);
+      allPathes.splice(ind, 0, ...ps);
     })
   );
-  allPathes = [...allPathes.reverse(), mainPath];
-  return allPathes;
+  allPathes = [...allPathes, mainPath];
+  return [...new Set(allPathes)];
 }
 
-async function getInnerImports(mainPath, mainRoot, pathes = []) {
+async function getInnerImports(mainPath, mainRoot, ind, pathes = []) {
   try {
     let pathFiles = [];
     const mainDir = path.dirname(mainPath);
@@ -298,18 +304,21 @@ async function getInnerImports(mainPath, mainRoot, pathes = []) {
     });
     if (!pathFiles.length) return pathFiles;
     let allPathes = [...pathFiles];
+    const indexPathes = [...pathes];
+    indexPathes.splice(ind, 0, ...pathFiles);
     await Promise.all(
-      pathFiles.map(async (p) => {
-        const ps = await getInnerImports(p, mainRoot, [
-          ...pathes,
-          ...pathFiles,
+      pathFiles.map(async (p, i) => {
+        const ps = await getInnerImports(p, mainRoot, i, [
+          // ...pathes,
+          // ...pathFiles,
+          ...indexPathes
         ]);
-        allPathes = [...allPathes, ...ps];
+        // allPathes = [...allPathes, ...ps];
+        allPathes.splice(i, 0, ...ps);
       })
     );
     return allPathes;
   } catch (error) {
-    console.log(error);
     throw error;
   }
 }
@@ -328,17 +337,16 @@ async function importAllFiles(pathes) {
       }
     });
     fs.closeSync(fd);
-    const less = fs.readFileSync(
+    const lessData = fs.readFileSync(
       path.join(__dirname, "dist/main.less"),
       "utf8"
     );
-    const res = await postcss().process(less, {
+    const res = await postcss().process(lessData, {
       syntax,
       from: mainPath,
     });
     return res;
   } catch (error) {
-    console.log(error);
     throw error;
   }
 }
@@ -350,7 +358,7 @@ function writeToFile(text) {
       fs.mkdirSync("./dist");
     }
     const fd = fs.openSync(mainPath, "w+");
-    fs.writeFileSync(mainPath, Buffer.from(JSON.stringify(text)));
+    fs.writeFileSync(mainPath, JSON.stringify(text)); //Buffer.from(JSON.stringify(text))
     fs.closeSync(fd);
   } catch (error) {
     console.log(error);
@@ -377,13 +385,14 @@ async function start() {
     });
     const allImports = await getAllFilesName(mainRoot.root, mainPath);
     const newRoot = await importAllFiles(allImports);
-
     const ast = getCleanTree(newRoot);
-    const mapMixins = getAllMixins(ast.root);
-    const allDecl = walkDecls(ast.root);
+    
+    const mapMixins = getAllMixins(ast.root);    
+    const varsLess= getVarsAndMixins(ast.root).vars;
+    const allDecl = walkDecls(ast.root, varsLess);
     parseVariables(allDecl);
+    
     const filteredVars = filterVariables(allDecl, vars);
-    // console.log(allDecl);
     writeToFile(filteredVars);
   } catch (error) {
     console.log(error);
@@ -412,3 +421,6 @@ async function getCorrectParams() {
 }
 
 start();
+
+
+// console.log(process.env.NODE_ENV = 'production');
